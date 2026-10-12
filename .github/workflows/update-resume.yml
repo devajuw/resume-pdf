@@ -28,7 +28,7 @@ jobs:
       - name: Run scraper
         env:
           OVERLEAF_URL: ${{ secrets.OVERLEAF_URL }}
-        run: node scraper.js
+        run: node scrapper.js
 
       - name: Commit and push if changed
         run: |
