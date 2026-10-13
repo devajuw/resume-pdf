@@ -20,16 +20,20 @@ const OUTPUT_FILE = 'resume.pdf';
     timeout: 90000
   });
 
-  // Wait for the download link to appear
-  await page.waitForSelector('a[href*="/download/project"][href*="output.pdf"]', {
-    state: 'attached',
-    timeout: 90000
-  });
+  // Wait for the PDF link to appear (Overleaf link formats can vary)
+  await page.waitForFunction(() => {
+    const links = Array.from(document.querySelectorAll('a[href]'));
+    return links.some(a =>
+      a.href.includes('output.pdf') || a.href.includes('/download/project')
+    );
+  }, { timeout: 90000 });
 
   // Get the download URL
   const pdfUrl = await page.evaluate(() => {
-    const links = Array.from(document.querySelectorAll('a[href*="/download/project"]'));
-    const pdfLink = links.find(a => a.href.includes('output.pdf'));
+    const links = Array.from(document.querySelectorAll('a[href]'));
+    const pdfLink =
+      links.find(a => a.href.includes('output.pdf')) ||
+      links.find(a => a.href.includes('/download/project'));
     return pdfLink ? pdfLink.href : null;
   });
 
