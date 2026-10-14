@@ -20,32 +20,43 @@ const OUTPUT_FILE = 'resume.pdf';
     timeout: 90000
   });
 
-  // Wait for the PDF link to appear (Overleaf link formats can vary)
-  await page.waitForFunction(() => {
+  // Get the download URL from the page if available
+  const pagePdfUrl = await page.evaluate(() => {
     const links = Array.from(document.querySelectorAll('a[href]'));
-    return links.some(a =>
-      a.href.includes('output.pdf') || a.href.includes('/download/project')
-    );
-  }, undefined, { timeout: 90000 });
-
-  // Get the download URL
-  const pdfUrl = await page.evaluate(() => {
-    const links = Array.from(document.querySelectorAll('a[href]'));
-    const pdfLink =
-      links.find(a => a.href.includes('output.pdf')) ||
-      links.find(a => a.href.includes('/download/project'));
-    return pdfLink ? pdfLink.href : null;
+    const pdfLink = links.find(a => {
+      const href = a.href.toLowerCase();
+      const text = (a.textContent || '').toLowerCase();
+      return (
+        href.includes('output.pdf') ||
+        href.includes('/download/project') ||
+        href.includes('.pdf') ||
+        (href.includes('/download') && (href.includes('pdf') || text.includes('pdf')))
+      );
+    });
+    return pdfLink?.href || null;
   });
 
-  if (!pdfUrl) {
-    console.error('Could not find PDF download link');
+  const fallbackPdfUrl = `${OVERLEAF_URL.replace(/\/$/, '')}.pdf`;
+  const candidateUrls = [...new Set([pagePdfUrl, fallbackPdfUrl].filter(Boolean))];
+
+  let buffer = null;
+  for (const candidateUrl of candidateUrls) {
+    const response = await page.request.get(candidateUrl);
+    const body = await response.body();
+    const contentType = response.headers()['content-type'] || '';
+    const isPdf = contentType.includes('application/pdf') || body.subarray(0, 4).toString() === '%PDF';
+
+    if (response.ok() && isPdf) {
+      buffer = body;
+      break;
+    }
+  }
+
+  if (!buffer) {
+    console.error('Could not download PDF from any known URL');
     await browser.close();
     process.exit(1);
   }
-
-  console.log('Downloading PDF...');
-  const response = await page.request.get(pdfUrl);
-  const buffer = await response.body();
 
   fs.writeFileSync(OUTPUT_FILE, buffer);
   console.log(`Saved ${OUTPUT_FILE}`);
