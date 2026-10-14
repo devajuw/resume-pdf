@@ -26,7 +26,7 @@ const OUTPUT_FILE = 'resume.pdf';
     return links.some(a =>
       a.href.includes('output.pdf') || a.href.includes('/download/project')
     );
-  }, { timeout: 90000 });
+  }, undefined, { timeout: 90000 });
 
   // Get the download URL
   const pdfUrl = await page.evaluate(() => {
