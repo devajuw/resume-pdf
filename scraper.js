@@ -20,12 +20,37 @@ const OUTPUT_FILE = 'resume.pdf';
     timeout: 90000
   });
 
-  // Get the download URL from the page if available
+  // Wait briefly for dynamically rendered download links to appear.
+  try {
+    await page.waitForFunction(() => {
+      const elements = Array.from(document.querySelectorAll('[href], [data-href]'));
+      return elements.some(element => {
+        const raw =
+          element.getAttribute('href') ||
+          element.getAttribute('data-href') ||
+          '';
+        const value = raw.toLowerCase();
+        return (
+          value.includes('output.pdf') ||
+          value.includes('/download/project') ||
+          (value.includes('/download') && value.includes('pdf'))
+        );
+      });
+    }, undefined, { timeout: 30000 });
+  } catch {
+    // Continue with fallback URL even if no page link appears in time.
+  }
+
+  // Get the download URL from the page if available.
   const pagePdfUrl = await page.evaluate(() => {
-    const links = Array.from(document.querySelectorAll('a[href]'));
-    const pdfLink = links.find(a => {
-      const href = a.href.toLowerCase();
-      const text = (a.textContent || '').toLowerCase();
+    const elements = Array.from(document.querySelectorAll('[href], [data-href]'));
+    const pdfLink = elements.find(element => {
+      const raw =
+        element.getAttribute('href') ||
+        element.getAttribute('data-href') ||
+        '';
+      const href = raw.toLowerCase();
+      const text = (element.textContent || '').toLowerCase();
       return (
         href.includes('output.pdf') ||
         href.includes('/download/project') ||
@@ -33,7 +58,13 @@ const OUTPUT_FILE = 'resume.pdf';
         (href.includes('/download') && (href.includes('pdf') || text.includes('pdf')))
       );
     });
-    return pdfLink?.href || null;
+    if (!pdfLink) return null;
+
+    const raw =
+      pdfLink.getAttribute('href') ||
+      pdfLink.getAttribute('data-href') ||
+      '';
+    return new URL(raw, window.location.origin).href;
   });
 
   const fallbackPdfUrl = `${OVERLEAF_URL.replace(/\/$/, '')}.pdf`;
